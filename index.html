@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; manifest-src 'self'; worker-src 'self'">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="ikona-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<title>Ważne daty</title>
+<!-- Ważne daty – prosta lista wydarzeń z odliczaniem (wersja dla Mamy, na podstawie „Odliczania” z Centrum Jana).
+     Na telefonie (Android, Chrome): otwierasz adres raz → „Dodaj do ekranu głównego” → ikona jak aplikacja, działa bez internetu (sw.js).
+     Dane: pamięć telefonu (localStorage, nigdy nie idą do sieci) + kopia zapasowa w pliku .json (przycisk „Kopia zapasowa”). -->
+<style>
+:root{--bg:#f2f2f7;--card:#fff;--ink:#1c1c1e;--mute:#8e8e93;--mute2:#6c6c70;--line:rgba(60,60,67,.14);--fill:#f2f2f7;--blue:#007aff;--green:#34c759;--red:#ff3b30;--orange:#ff9500;--yellow:#ffcc00;
+  --r:22px;--sh:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.06);--font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--ink:#fff;--mute:#8e8e93;--mute2:#aeaeb2;--line:rgba(84,84,88,.6);--fill:#2c2c2e;--blue:#0a84ff;--green:#30d158;--red:#ff453a;--orange:#ff9f0a;--sh:none}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.42 var(--font);-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+.wrap{max-width:640px;margin:0 auto;padding:max(14px,env(safe-area-inset-top)) 16px 130px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:18px 4px 2px}
+h1{font-size:34px;line-height:1.1;margin:0;font-weight:800;letter-spacing:-.02em}
+.dzis{color:var(--mute);font-size:16px;margin:2px 4px 18px;font-weight:500}
+.ic{width:44px;height:44px;border-radius:50%;background:var(--card);box-shadow:var(--sh);display:grid;place-items:center;font-size:20px;transition:transform .15s}
+.ic:active{transform:scale(.92)}
+.big{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;max-width:420px;border-radius:999px;padding:16px 22px;font-size:19px;font-weight:700;background:var(--blue);color:#fff;box-shadow:0 8px 24px rgba(0,122,255,.35);transition:transform .15s}
+.big:active{transform:scale(.97)}
+.btn{border-radius:12px;padding:10px 14px;font-size:16px;font-weight:600;background:var(--fill);color:var(--ink);transition:transform .12s,opacity .12s}
+.btn:active{transform:scale(.96);opacity:.8}
+.btn.ok{background:var(--green);color:#fff}
+.btn.blue{background:var(--blue);color:#fff}
+.btn.red{color:var(--red);background:transparent}
+.btn.tint{color:var(--blue);background:transparent;padding-left:6px;padding-right:6px}
+.alert{border-radius:18px;padding:14px 16px;margin:0 0 16px;font-size:16px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--card);box-shadow:var(--sh)}
+.alert.kopia{border-left:5px solid var(--orange)}
+.alert.blad{border-left:5px solid var(--red)}
+h2{font-size:15px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--mute);margin:26px 8px 8px}
+.pusto{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:34px 22px;text-align:center;color:var(--mute2)}
+.pusto .duza{font-size:54px;line-height:1;margin-bottom:10px}
+/* karta wydarzenia */
+.ev{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:16px 16px 14px;margin-bottom:12px;animation:wejscie .35s cubic-bezier(.2,.8,.2,1) both}
+@keyframes wejscie{from{opacity:0;transform:translateY(10px)}}
+.gora{display:flex;gap:14px;align-items:center}
+.ikona{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;font-size:27px;flex:none;background:var(--tint,#eef3ff)}
+.srodek{flex:1;min-width:0}
+.tyt{font-size:19px;font-weight:700;line-height:1.25;overflow-wrap:anywhere}
+.kiedy{font-size:15px;color:var(--mute);margin-top:2px}
+.ile{text-align:right;flex:none;min-width:62px}
+.ile b{display:block;font-size:30px;font-weight:800;line-height:1;letter-spacing:-.02em;color:var(--kol)}
+.ile span{font-size:12.5px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.03em}
+.ile.slowo b{font-size:20px;line-height:1.3}
+/* pasek odliczania */
+.pasek{height:8px;border-radius:99px;background:var(--fill);margin:14px 0 4px;overflow:hidden}
+.pasek i{display:block;height:100%;border-radius:99px;background:var(--kol);width:var(--w);transition:width .9s cubic-bezier(.2,.8,.2,1),background .6s;animation:rosnij 1s cubic-bezier(.2,.8,.2,1) both}
+@keyframes rosnij{from{width:0}}
+.ev.zalegle .pasek i{animation:rosnij 1s both,puls 1.6s ease-in-out 1s infinite}
+@keyframes puls{50%{opacity:.55}}
+.pod{display:flex;justify-content:space-between;font-size:12.5px;color:var(--mute);font-weight:500}
+.notka{font-size:15.5px;color:var(--mute2);white-space:pre-wrap;margin-top:10px;padding:10px 12px;background:var(--fill);border-radius:12px}
+.lista{margin:10px 0 0;padding:0;list-style:none;border-top:1px solid var(--line)}
+.lista li{border-bottom:1px solid var(--line)}
+.lista label{display:flex;gap:12px;align-items:center;padding:11px 2px;cursor:pointer;font-size:17px}
+.lista input{position:absolute;opacity:0;pointer-events:none}
+.kolko{width:26px;height:26px;border-radius:50%;border:2px solid #c7c7cc;flex:none;display:grid;place-items:center;transition:all .2s}
+.lista input:checked+.kolko{background:var(--green);border-color:var(--green)}
+.lista input:checked+.kolko::after{content:"";width:7px;height:12px;border:solid #fff;border-width:0 2.5px 2.5px 0;transform:translateY(-1px) rotate(45deg)}
+.lista input:checked~.txt{text-decoration:line-through;color:var(--mute)}
+.lista input:focus-visible+.kolko{outline:3px solid var(--blue);outline-offset:2px}
+.akcje{display:flex;gap:8px;margin-top:12px;align-items:center}
+.akcje .ok{flex:1;padding:13px}
+.zr .ev{opacity:.6;animation:none}
+details.zr{margin-top:22px}
+details.zr summary{list-style:none;font-size:15px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--mute);cursor:pointer;padding:6px 8px}
+details.zr summary::-webkit-details-marker{display:none}
+details.zr summary::after{content:" ›";display:inline-block;transition:transform .2s}details.zr[open] summary::after{transform:rotate(90deg)}
+/* arkusz od dołu */
+.tlo{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:flex-end;justify-content:center;z-index:20;opacity:0;pointer-events:none;transition:opacity .3s}
+.tlo.on{opacity:1;pointer-events:auto}
+.okno{background:var(--bg);border-radius:26px 26px 0 0;width:min(640px,100%);max-height:92vh;overflow:auto;padding:8px 16px calc(20px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .38s cubic-bezier(.2,.9,.25,1)}
+.tlo.on .okno{transform:none}
+.uchwyt{width:40px;height:5px;border-radius:9px;background:#c7c7cc;margin:4px auto 6px}
+.ok-gora{display:flex;justify-content:space-between;align-items:center;margin:0 0 10px}
+.ok-gora h3{font-size:18px;margin:0;font-weight:700}
+.grupa{background:var(--card);border-radius:16px;margin-bottom:16px;overflow:hidden}
+.grupa>.wiersz{padding:12px 16px;border-bottom:1px solid var(--line)}.grupa>.wiersz:last-child{border-bottom:0}
+.lab{display:block;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--mute);margin:0 8px 6px}
+.wiersz input[type=text],.wiersz input[type=date],.wiersz textarea{width:100%;border:0;background:transparent;font-size:18px;padding:2px 0;outline:0}
+.wiersz textarea{resize:vertical}
+.kat{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px}
+.kat button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 2px;border-radius:14px;font-size:12.5px;font-weight:600;color:var(--mute2);transition:transform .12s,background .2s}
+.kat button span{font-size:26px;width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:var(--fill)}
+.kat button.on{background:var(--fill);color:var(--ink)}.kat button.on span{background:var(--blue);box-shadow:0 4px 12px rgba(0,122,255,.3)}
+.kat button:active{transform:scale(.94)}
+.seg{display:flex;background:var(--fill);border-radius:11px;padding:3px;margin:12px}
+.seg button{flex:1;padding:9px 4px;border-radius:9px;font-size:15px;font-weight:600;color:var(--mute2);transition:all .2s}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.krok{display:flex;gap:10px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}
+.krok input{flex:1;border:0;background:transparent;font-size:17px;outline:0}
+.krok button{width:28px;height:28px;border-radius:50%;background:var(--red);color:#fff;font-size:16px;line-height:1;flex:none}
+.dodaj-krok{display:block;width:100%;text-align:left;padding:12px 16px;color:var(--blue);font-weight:600;font-size:17px}
+.podp{font-size:13.5px;color:var(--mute);margin:-8px 10px 16px}
+.stopka{display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;margin-top:4px}
+.kopia-panel p{margin:0 0 12px;font-size:16px;color:var(--mute2)}
+.kopia-panel .grupa{padding:6px}
+.kopia-panel .grupa .btn{display:block;width:100%;text-align:left;padding:14px 12px;background:transparent;font-size:17px}
+.toast{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translate(-50%,20px);background:rgba(28,28,30,.92);backdrop-filter:blur(12px);color:#fff;padding:13px 18px;border-radius:16px;font-size:16px;opacity:0;transition:all .3s cubic-bezier(.2,.8,.2,1);pointer-events:none;z-index:30;max-width:calc(100vw - 32px);text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.toast .btn{background:rgba(255,255,255,.18);color:#fff;margin-left:8px;padding:5px 12px}
+.dol{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(14px + env(safe-area-inset-bottom));display:flex;justify-content:center;z-index:10;background:linear-gradient(to top,var(--bg) 55%,transparent)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media print{.dol,.akcje,.alert,header .ic{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>Ważne daty</h1><button class="ic" id="kopiaBtn" aria-label="Kopia zapasowa" title="Kopia zapasowa">💾</button></header>
+  <p class="dzis" id="dzis"></p>
+  <div id="alerty"></div>
+  <div id="lista"></div>
+</div>
+<div class="dol"><button class="big" id="dodajBtn">＋ Dodaj ważną datę</button></div>
+
+<!-- arkusz: dodaj / zmień -->
+<div class="tlo" id="tloEd"><div class="okno" role="dialog" aria-modal="true" aria-labelledby="edT">
+  <div class="uchwyt"></div>
+  <div class="ok-gora"><button class="btn tint" id="fAnuluj" type="button">Anuluj</button><h3 id="edT">Nowa data</h3><button class="btn tint" id="fZapisz" type="button" style="font-weight:800">Zapisz</button></div>
+  <span class="lab">Co to jest?</span>
+  <div class="grupa"><div class="wiersz"><input type="text" id="fTyt" placeholder="np. Urodziny Janka" aria-label="Co to jest"></div></div>
+  <span class="lab">Rodzaj</span>
+  <div class="grupa"><div class="kat" id="fKat"></div></div>
+  <span class="lab">Kiedy</span>
+  <div class="grupa"><div class="wiersz"><input type="date" id="fData" aria-label="Data"></div>
+    <div class="seg" id="fPow"><button type="button" data-v="raz">Jeden raz</button><button type="button" data-v="rok">Co roku</button><button type="button" data-v="mies">Co miesiąc</button></div></div>
+  <p class="podp">„Co roku” – urodziny, imieniny, rocznice. „Co miesiąc” – np. rachunki.</p>
+  <span class="lab">Co trzeba zrobić · można pominąć</span>
+  <div class="grupa"><div id="fKroki"></div><button class="dodaj-krok" id="fKrokDod" type="button">＋ Dodaj punkt</button></div>
+  <p class="podp">Np. „kupić prezent”, „zadzwonić”, „wziąć wyniki badań”. Każdy punkt odhaczasz osobno.</p>
+  <span class="lab">Notatka · można pominąć</span>
+  <div class="grupa"><div class="wiersz"><textarea id="fNot" rows="2" placeholder="np. adres, godzina, telefon" aria-label="Notatka"></textarea></div></div>
+  <button class="btn ok" id="fZapisz2" type="button" style="width:100%;padding:15px;font-size:18px">✓ Zapisz</button>
+  <button class="btn red" id="fUsun" type="button" style="width:100%;margin-top:6px;padding:14px">Usuń tę datę</button>
+</div></div>
+
+<!-- arkusz: kopia zapasowa -->
+<div class="tlo" id="tloKop"><div class="okno kopia-panel" role="dialog" aria-modal="true" aria-labelledby="kpT">
+  <div class="uchwyt"></div>
+  <div class="ok-gora"><span style="width:60px"></span><h3 id="kpT">Kopia zapasowa</h3><button class="btn tint" id="kpZamknij" type="button" style="font-weight:800">Gotowe</button></div>
+  <p>Wszystko zapisuje się samo w telefonie. Na wszelki wypadek co 2 tygodnie zrób kopię – to jeden plik. Najlepiej wyślij go <b>mailem do siebie</b>.</p>
+  <p id="kpOst"></p>
+  <div class="grupa"><button class="btn" id="kpZapisz" type="button">⬇️&nbsp; Zapisz kopię</button><button class="btn" id="kpWczytaj" type="button">⬆️&nbsp; Wczytaj kopię z pliku</button></div>
+  <input type="file" id="kpPlik" accept=".json,application/json" hidden>
+  <p style="font-size:14px">Wczytanie kopii zastępuje obecną listę tym, co jest w pliku – aplikacja najpierw zapyta.</p>
+</div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+const KEY='wazne-daty-v1', KEY_KOPIA='wazne-daty-ostatnia-kopia';
+const $=s=>document.querySelector(s);
+const KAT=[['urodziny','🎂','Urodziny','#ffe5ee'],['imieniny','🌷','Imieniny','#fff0d4'],['rocznica','💐','Rocznica','#fbe6f5'],['lekarz','🩺','Lekarz','#e1f0ff'],['rachunki','💳','Rachunki','#e3f6e8'],['rodzina','👪','Rodzina','#ece6ff'],['dom','🏠','Dom','#ffecdc'],['inne','📌','Inne','#eceef2']];
+const MIES=['stycznia','lutego','marca','kwietnia','maja','czerwca','lipca','sierpnia','września','października','listopada','grudnia'];
+const DNI=['niedziela','poniedziałek','wtorek','środa','czwartek','piątek','sobota'];
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const zIso=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const dzis=()=>{const d=new Date();d.setHours(0,0,0,0);return d};
+const ladnie=d=>DNI[d.getDay()]+', '+d.getDate()+' '+MIES[d.getMonth()]+' '+d.getFullYear();
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+
+/* ── dane: pamięć przeglądarki ── */
+let D={wersja:1,wydarzenia:[]}, blad=false;
+try{const t=localStorage.getItem(KEY);if(t){const x=JSON.parse(t);if(x&&Array.isArray(x.wydarzenia))D=x}}catch(e){blad=true}
+function zapisz(){try{localStorage.setItem(KEY,JSON.stringify(D));return true}catch(e){blad=true;rysuj();return false}}
+// prośba do przeglądarki, żeby nie czyściła danych przy braku miejsca
+try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
+
+/* ── terminy: najbliższe wystąpienie ── */
+function dodajMies(d,n){const x=new Date(d.getFullYear(),d.getMonth()+n,1),ost=new Date(x.getFullYear(),x.getMonth()+1,0).getDate();x.setDate(Math.min(d.getDate(),ost));return x}
+function najblizsze(e){  // data, którą teraz pokazujemy (dla powtarzanych: pierwsza niezałatwiona)
+  let d=zIso(e.data);
+  if(e.pow==='raz')return d;
+  const od=e.zalatwione?zIso(e.zalatwione):null;  // ostatnio załatwione wystąpienie
+  if(od){while(d<=od)d=e.pow==='rok'?dodajMies(d,12):dodajMies(d,1)}
+  return d;
+}
+const ileDni=d=>Math.round((d-dzis())/864e5);
+const HORYZONT={raz:30,mies:30,rok:60};  // od ilu dni przed terminem pasek zaczyna się zapełniać
+function pasek(n,pow){const h=HORYZONT[pow]||30;if(n<0)return {w:100,kol:'#ff3b30'};if(n===0)return {w:100,kol:'#ff7a00'};const t=Math.min(1,n/h);return {w:Math.max(4,Math.round((1-t)*100)),kol:'hsl('+Math.round(4+t*136)+',82%,'+(46-Math.round(Math.sin(t*Math.PI)*4))+'%)'}}
+function napisIle(n){
+  if(n<0)return ['r',(n===-1?'wczoraj':(-n)+' dni temu')+' – czeka'];
+  if(n===0)return ['a','DZIŚ'];if(n===1)return ['a','JUTRO'];
+  if(n<=7)return ['b','za '+n+' dni'];
+  return ['g','za '+n+' dni'];
+}
+
+/* ── widok ── */
+function rysuj(){
+  $('#dzis').textContent='Dziś jest '+ladnie(dzis())+'.';
+  // alerty: kopia zapasowa, błąd zapisu
+  let a='';
+  if(blad)a+='<div class="alert blad"><span>⚠ Przeglądarka nie pozwala zapisać zmian. Zrób kopię zapasową i daj znać Jankowi.</span><button class="btn" data-kopia>💾 Kopia</button></div>';
+  const ost=lsGet(KEY_KOPIA),dni=ost?Math.floor((Date.now()-ost)/864e5):null;
+  if(D.wydarzenia.length&&(dni===null||dni>=14))a+='<div class="alert kopia"><span>💾 '+(dni===null?'Nie ma jeszcze kopii zapasowej.':'Ostatnia kopia: '+dni+' dni temu.')+' Zrób kopię – jedno kliknięcie.</span><button class="btn ok" data-szybka>⬇ Zapisz kopię</button></div>';
+  $('#alerty').innerHTML=a;
+  const akt=D.wydarzenia.filter(e=>!e.zrobione).map(e=>({e,d:najblizsze(e)})).map(x=>Object.assign(x,{n:ileDni(x.d)})).sort((x,y)=>x.d-y.d);
+  const zr=D.wydarzenia.filter(e=>e.zrobione).sort((x,y)=>(y.zrobione||'').localeCompare(x.zrobione||''));
+  if(!akt.length&&!zr.length){$('#lista').innerHTML='<div class="pusto"><div class="duza">📅</div><p style="font-size:21px;margin:0 0 8px;color:var(--ink);font-weight:700">Tu pojawią się ważne daty</p><p style="margin:0 0 16px">Kliknij na dole <b>„＋ Dodaj ważną datę”</b>.</p><button class="btn" data-kopia>⬆ Mam kopię zapasową – wczytaj</button></div>';wiaz();return}
+  const grupy=[['Czeka / dziś',x=>x.n<=0],['W tym tygodniu',x=>x.n>0&&x.n<=7],['W tym miesiącu',x=>x.n>7&&x.n<=31],['Później',x=>x.n>31]];
+  let h='';
+  grupy.forEach(([t,f])=>{const g=akt.filter(f);if(g.length)h+='<h2>'+t+'</h2>'+g.map(karta).join('')});
+  if(!akt.length)h+='<div class="pusto"><div class="duza">🌿</div>Nic nie czeka.</div>';
+  if(zr.length)h+='<details class="zr"><summary>Zrobione ('+zr.length+')</summary><div class="zrobione" style="margin-top:10px">'+zr.map(e=>'<div class="ev"><div class="gora">'+ikonaHTML(e.kat)+'<div class="srodek"><div class="tyt">'+esc(e.tyt)+'</div><div class="kiedy">zrobione '+esc(fmt(e.zrobione))+'</div></div></div><div class="akcje"><button class="btn" data-przywroc="'+e.id+'">↩ Przywróć</button><button class="btn red" data-usun="'+e.id+'">Usuń</button></div></div>').join('')+'</div></details>';
+  $('#lista').innerHTML=h;wiaz();
+}
+const katOf=k=>KAT.find(x=>x[0]===k)||KAT[KAT.length-1],ikona=k=>katOf(k)[1];
+const ikonaHTML=k=>'<div class="ikona" style="--tint:'+katOf(k)[3]+'">'+katOf(k)[1]+'</div>';
+const fmt=s=>{if(!s)return '';const d=zIso(s.slice(0,10));return d.getDate()+' '+MIES[d.getMonth()]+' '+d.getFullYear()};
+function karta({e,d,n}){
+  const pow={rok:'co roku',mies:'co miesiąc'}[e.pow],p=pasek(n,e.pow);
+  const kroki=e.kroki||[],zrob=kroki.filter(k=>k.ok).length;
+  const liczba=n<0?'<b>'+(-n)+'</b><span>'+(n===-1?'dzień temu':'dni temu')+'</span>':n===0?'<b>Dziś</b><span>&nbsp;</span>':n===1?'<b>Jutro</b><span>&nbsp;</span>':'<b>'+n+'</b><span>dni</span>';
+  return '<div class="ev'+(n<0?' zalegle':n===0?' dzis':'')+'" style="--kol:'+p.kol+'">'+
+    '<div class="gora">'+ikonaHTML(e.kat)+'<div class="srodek"><div class="tyt">'+esc(e.tyt)+'</div><div class="kiedy">'+esc(ladnie(d))+(pow?' · '+pow:'')+'</div></div>'+
+    '<div class="ile'+(n===0||n===1?' slowo':'')+'">'+liczba+'</div></div>'+
+    '<div class="pasek" role="img" aria-label="'+(n<0?'po terminie':'zostało '+n+' dni')+'"><i style="--w:'+p.w+'%"></i></div>'+
+    '<div class="pod"><span>'+(n<0?'czeka – po terminie':n===0?'to dziś!':'zostało '+n+' '+(n===1?'dzień':'dni'))+'</span><span>'+(kroki.length?'zrobione '+zrob+' z '+kroki.length:'')+'</span></div>'+
+    (e.not?'<div class="notka">'+esc(e.not)+'</div>':'')+
+    (kroki.length?'<ul class="lista">'+kroki.map((k,i)=>'<li><label><input type="checkbox" data-krok="'+e.id+'" data-i="'+i+'"'+(k.ok?' checked':'')+'><span class="kolko"></span><span class="txt">'+esc(k.t)+'</span></label></li>').join('')+'</ul>':'')+
+    '<div class="akcje"><button class="btn ok" data-gotowe="'+e.id+'">✓ Załatwione'+(e.pow==='rok'?' w tym roku':e.pow==='mies'?' w tym miesiącu':'')+'</button><button class="btn" data-zmien="'+e.id+'" aria-label="Zmień">✎ Zmień</button></div></div>';
+}
+function wiaz(){
+  document.querySelectorAll('[data-krok]').forEach(c=>c.onchange=()=>{const e=znajdz(c.dataset.krok);e.kroki[+c.dataset.i].ok=c.checked;zapisz();rysuj();
+    if(e.kroki.length&&e.kroki.every(k=>k.ok))toast('Wszystkie punkty zrobione – kliknij „✓ Załatwione”')});
+  document.querySelectorAll('[data-gotowe]').forEach(b=>b.onclick=()=>gotowe(b.dataset.gotowe));
+  document.querySelectorAll('[data-zmien]').forEach(b=>b.onclick=()=>edytuj(b.dataset.zmien));
+  document.querySelectorAll('[data-przywroc]').forEach(b=>b.onclick=()=>{const e=znajdz(b.dataset.przywroc);delete e.zrobione;zapisz();rysuj();toast('Przywrócone')});
+  document.querySelectorAll('[data-usun]').forEach(b=>b.onclick=()=>usun(b.dataset.usun));
+  document.querySelectorAll('[data-kopia]').forEach(b=>b.onclick=otworzKopie);
+  document.querySelectorAll('[data-szybka]').forEach(b=>b.onclick=zapiszKopie);
+}
+const znajdz=id=>D.wydarzenia.find(e=>e.id===id);
+
+/* ── załatwione / cofnij ── */
+let cofnij=null;
+function gotowe(id){
+  const e=znajdz(id),przed=JSON.stringify(e);
+  if(e.pow==='raz')e.zrobione=iso(new Date());
+  else{e.zalatwione=iso(najblizsze(e));(e.kroki||[]).forEach(k=>k.ok=false)}  // powtarzane: następny termin, punkty od nowa
+  zapisz();rysuj();
+  cofnij=()=>{const i=D.wydarzenia.findIndex(x=>x.id===id);D.wydarzenia[i]=JSON.parse(przed);zapisz();rysuj()};
+  toast(e.pow==='raz'?'Załatwione 👍 (jest w „Zrobione”)':'Załatwione 👍 Następny raz: '+ladnie(najblizsze(e)),true);
+}
+function usun(id){const e=znajdz(id);if(!confirm('Usunąć na zawsze: „'+e.tyt+'”?'))return;D.wydarzenia=D.wydarzenia.filter(x=>x.id!==id);zapisz();zamknij('#tloEd');rysuj();toast('Usunięte')}
+
+/* ── formularz ── */
+let ed=null,kat='inne',pw='raz';
+function wybor(sel,val,on){document.querySelectorAll(sel+' button').forEach(b=>b.classList.toggle('on',b.dataset.v===val));on&&on(val)}
+$('#fKat').innerHTML=KAT.map(([v,i,t])=>'<button type="button" data-v="'+v+'"><span>'+i+'</span>'+t+'</button>').join('');
+$('#fKat').onclick=e=>{const b=e.target.closest('button');if(!b)return;kat=b.dataset.v;wybor('#fKat',kat);if(['urodziny','imieniny','rocznica'].includes(kat)&&!ed){pw='rok';wybor('#fPow',pw)}};
+$('#fPow').onclick=e=>{const b=e.target.closest('button');if(!b)return;pw=b.dataset.v;wybor('#fPow',pw)};
+function krokPole(t){const w=document.createElement('div');w.className='krok';w.innerHTML='<input type="text" placeholder="np. kupić prezent" value="'+esc(t||'')+'" aria-label="Punkt do zrobienia"><button type="button" title="Usuń punkt" aria-label="Usuń punkt">−</button>';w.querySelector('button').onclick=()=>w.remove();$('#fKroki').appendChild(w);return w}
+$('#fKrokDod').onclick=()=>krokPole('').querySelector('input').focus();
+function otworz(sel){$(sel).classList.add('on');document.body.style.overflow='hidden'}
+function zamknij(sel){$(sel).classList.remove('on');document.body.style.overflow=''}
+function edytuj(id){
+  ed=id?znajdz(id):null;
+  $('#edT').textContent=ed?'Zmień':'Nowa data';
+  $('#fTyt').value=ed?ed.tyt:'';$('#fData').value=ed?ed.data:iso(new Date());$('#fNot').value=ed?ed.not||'':'';
+  kat=ed?ed.kat:'inne';pw=ed?ed.pow:'raz';wybor('#fKat',kat);wybor('#fPow',pw);
+  $('#fKroki').innerHTML='';(ed&&ed.kroki||[]).forEach(k=>krokPole(k.t));
+  $('#fUsun').style.display=ed?'':'none';
+  otworz('#tloEd');setTimeout(()=>$('#fTyt').focus(),50);
+}
+$('#dodajBtn').onclick=()=>edytuj(null);
+$('#fAnuluj').onclick=()=>zamknij('#tloEd');
+$('#fUsun').onclick=()=>ed&&usun(ed.id);
+$('#fZapisz2').onclick=()=>$('#fZapisz').onclick();
+$('#fZapisz').onclick=()=>{
+  const tyt=$('#fTyt').value.trim(),data=$('#fData').value;
+  if(!tyt){toast('Wpisz, co to jest');$('#fTyt').focus();return}
+  if(!data){toast('Wybierz datę');$('#fData').focus();return}
+  const stare=ed?(ed.kroki||[]):[];
+  const kroki=[...$('#fKroki').querySelectorAll('input')].map(i=>i.value.trim()).filter(Boolean).map(t=>({t,ok:!!(stare.find(k=>k.t===t)||{}).ok}));
+  if(ed){const zmianaDaty=ed.data!==data||ed.pow!==pw;Object.assign(ed,{tyt,data,kat,pow:pw,not:$('#fNot').value.trim(),kroki});if(zmianaDaty)delete ed.zalatwione}
+  else D.wydarzenia.push({id:uid(),tyt,data,kat,pow:pw,not:$('#fNot').value.trim(),kroki,dodane:iso(new Date())});
+  if(zapisz()){zamknij('#tloEd');rysuj();toast(ed?'Zapisane ✓':'Dodane ✓')}
+};
+[$('#tloEd'),$('#tloKop')].forEach(t=>t.addEventListener('click',e=>{if(e.target===t)zamknij('#'+t.id)}));
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){zamknij('#tloEd');zamknij('#tloKop')}});
+
+/* ── kopia zapasowa ── */
+function lsGet(k){try{return +localStorage.getItem(k)||0}catch(e){return 0}}
+function otworzKopie(){const o=lsGet(KEY_KOPIA);$('#kpOst').textContent=o?'Ostatnia kopia: '+fmt(iso(new Date(o)))+'.':'Nie ma jeszcze żadnej kopii.';otworz('#tloKop')}
+$('#kopiaBtn').onclick=otworzKopie;$('#kpZamknij').onclick=()=>zamknij('#tloKop');
+async function zapiszKopie(){
+  const tekst=JSON.stringify(Object.assign({aplikacja:'Ważne daty',zapisano:new Date().toISOString()},D),null,1);
+  const nazwa='Wazne-daty-kopia-'+iso(new Date())+'.json';
+  const plik=new Blob([tekst],{type:'application/json'});
+  // telefon: okno „Udostępnij” (np. wyślij sobie mailem albo zapisz w plikach); komputer: plik do Pobranych
+  try{const f=new File([plik],nazwa,{type:'application/json'});if(navigator.canShare&&navigator.canShare({files:[f]})&&/Android|iPhone|iPad/i.test(navigator.userAgent)){await navigator.share({files:[f],title:'Kopia – Ważne daty'});oznacz();return}}catch(e){if(e&&e.name==='AbortError')return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(plik);a.download=nazwa;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);oznacz();
+}
+function oznacz(){try{localStorage.setItem(KEY_KOPIA,String(Date.now()))}catch(e){}toast('Kopia zapisana 💾 (folder Pobrane)');zamknij('#tloKop');rysuj()}
+$('#kpZapisz').onclick=zapiszKopie;
+$('#kpWczytaj').onclick=()=>$('#kpPlik').click();
+$('#kpPlik').onchange=async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{const x=JSON.parse(await f.text());if(!x||!Array.isArray(x.wydarzenia))throw 0;
+    if(D.wydarzenia.length&&!confirm('Zastąpić obecną listę ('+D.wydarzenia.length+') tym z kopii ('+x.wydarzenia.length+')?'))return;
+    D={wersja:1,wydarzenia:x.wydarzenia};if(zapisz()){zamknij('#tloKop');rysuj();toast('Wczytane z kopii ✓ ('+x.wydarzenia.length+')')}}
+  catch(err){toast('To nie jest plik kopii „Ważnych dat”')}
+};
+
+/* ── komunikaty ── */
+let tT=null;
+function toast(m,zCofnij){const t=$('#toast');t.innerHTML=esc(m)+(zCofnij?' &nbsp;<button class="btn" id="tCof" style="padding:4px 12px;font-size:15px;pointer-events:auto">Cofnij</button>':'');t.classList.add('on');t.style.pointerEvents=zCofnij?'auto':'none';
+  if(zCofnij)$('#tCof').onclick=()=>{if(cofnij){cofnij();cofnij=null}t.classList.remove('on');toast('Cofnięte')};
+  clearTimeout(tT);tT=setTimeout(()=>{t.classList.remove('on');t.style.pointerEvents='none'},zCofnij?7000:2600)}
+// odświeżenie o północy i po powrocie do karty (napisy „za ile dni” zawsze aktualne)
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)rysuj()});
+setInterval(rysuj,30*60e3);
+rysuj();
+// aplikacja bez internetu (tylko ze strony www – z pliku na dysku pomijane)
+if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{});
+})();
+</script>
+</body>
+</html>
